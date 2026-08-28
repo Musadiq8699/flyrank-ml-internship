@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Empirical Content Refresh Prioritization via Calibrated Tree Ensembles</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; line-height: 1.6; color: #1f2937; max-width: 860px; margin: 0 auto; padding: 2rem 1.25rem; }
+    h1 { font-size: 2.1rem; color: #111827; margin-bottom: 0.5rem; line-height: 1.25; }
+    .meta-bar { color: #4b5563; font-size: 0.95rem; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid #e5e7eb; }
+    h2 { font-size: 1.35rem; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.3rem; margin-top: 2rem; }
+    .abstract { background: #f8fafc; border-left: 4px solid #2563eb; padding: 1.25rem; border-radius: 4px; font-style: italic; margin-bottom: 2rem; }
+    table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.95rem; }
+    th, td { border: 1px solid #d1d5db; padding: 0.75rem; text-align: left; }
+    th { background: #f9fafb; font-weight: 600; }
+    code { background: #f3f4f6; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.88em; }
+    .badge { display: inline-block; padding: 0.2rem 0.5rem; background: #e0f2fe; color: #0369a1; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; }
+    ol, ul { padding-left: 1.5rem; }
+    li { margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+
+  <h1>Empirical Content Decay Prioritization via Calibrated Decision Ensembles</h1>
+  <div class="meta-bar">
+    <span class="badge">Lane 2: Refresh / Content Opportunity Scoring</span> &bull; <strong>Author:</strong> Musadaq Shafique &bull; <strong>Dataset:</strong> FlyRank Multi-Tenant Warehouse
+  </div>
+
+  <div class="abstract">
+    <strong>Abstract:</strong> Editorial and content marketing teams face severe capacity constraints when diagnosing organic search traffic decay across large multi-tenant footprints. Standard rule-based baseline heuristics suffer from threshold cliffing and over-prioritize low-CTR visibility gaps over true velocity losses. In this study, we formulate content refresh prioritization as a calibrated probabilistic classification task paired with an expected recoverable opportunity multiplier. Evaluating across 55,470 anonymized URL clusters using a 5-fold grouped cross-validation design (GroupKFold on content hash), our Calibrated Random Forest model improved Precision@10 from 12.00% &plusmn; 9.80% (heuristic baseline) to 60.00% &plusmn; 10.95% (&plus;48.00% lift) and Precision@20 from 12.00% &plusmn; 7.48% to 57.00% &plusmn; 7.48% (&plus;45.00% lift). This eliminates heuristic edge-case failures and delivers an actionable queue prioritizing high-yield editorial intervention.
+  </div>
+
+  <h2>1. Introduction & Problem Statement</h2>
+  <p>Search performance naturally decays over time due to keyword intent drift, competitor content updates, and search engine ranking adjustments. Content operations teams require an automated, decision-support queue to prioritize which URLs require immediate editorial rewrites versus normal variance.</p>
+  <p>The primary operational objective is to rank decaying content items by expected recoverable traffic while preventing low-volume long-tail pages from crowding human editorial review capacity.</p>
+
+  <h2>2. Data & Warehouse Scope</h2>
+  <p>This study evaluates performance metrics extracted from the multi-tenant daily search performance warehouse. Strict temporal boundaries were enforced to eliminate lookahead and entity leakage:</p>
+  <ul>
+    <li><strong>Baseline Observation Window:</strong> <code>[T-60d, T-31d]</code> &mdash; computes baseline volume (<code>clicks_prev_30d</code>, <code>impressions_prev_30d</code>).</li>
+    <li><strong>Decision / Evaluation Window:</strong> <code>[T-30d, T]</code> &mdash; computes recent performance (<code>clicks_last_30d</code>, <code>impressions_last_30d</code>, <code>position_last_30d</code>) and establishes ground-truth decay.</li>
+    <li><strong>Eligibility Gate:</strong> Inventory is filtered for active pages (<code>clicks_prev_30d &ge; 10</code> OR <code>impressions_last_30d &ge; 500</code>), eliminating dormant long-tail noise.</li>
+    <li><strong>Evaluated Inventory:</strong> 55,470 distinct eligible content hash groups with an empirical decay base rate of 28.71%.</li>
+  </ul>
+
+  <h2>3. Methodology & Validation Design</h2>
+  <p>We implement an Expected Opportunity Value scoring formulation:</p>
+  <p><code>Priority Score = P(Decay = 1 | x) &times; min(1.0, clicks_prev_30d / 50.0)</code></p>
+  <ul>
+    <li><strong>Classification Architecture:</strong> Random Forest Classifier (100 estimators, max depth 5, min leaf 20, balanced subsampling) with Sigmoid Probability Calibration (3-fold inner CV).</li>
+    <li><strong>Leak-Free Pre-Decision Features:</strong> Strictly pre-decision signals (<code>clicks_prev_30d</code>, <code>impressions_prev_30d</code>, and <code>position_last_30d</code>). Forward-looking ratios and downstream clicks are strictly excluded.</li>
+    <li><strong>Grouped Cross-Validation:</strong> 5-fold <code>GroupKFold</code> split on <code>content_hash_id</code>, ensuring complete entity isolation and 0% leakage between training and validation splits.</li>
+  </ul>
+
+  <h2>4. Empirical Results</h2>
+  <p>Both the deterministic rule baseline and the calibrated ML model were benchmarked on the identical 5 held-out validation folds:</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Decision Metric</th>
+        <th>Week 4 Rule Baseline</th>
+        <th>Week 5 ML Model (Calibrated RF)</th>
+        <th>Measured Lift</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Precision@10</strong></td>
+        <td>12.00% &plusmn; 9.80%</td>
+        <td><strong>60.00% &plusmn; 10.95%</strong></td>
+        <td><strong>&plus;48.00%</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Precision@20</strong></td>
+        <td>12.00% &plusmn; 7.48%</td>
+        <td><strong>57.00% &plusmn; 7.48%</strong></td>
+        <td><strong>&plus;45.00%</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>5. Limitations & Error Analysis</h2>
+  <ul>
+    <li><strong>Feature Reliance:</strong> Permutation importance confirms <code>position_last_30d</code> (mean importance: 0.0732) is the primary leading indicator of traffic decay, followed by baseline impression volume (0.0199) and click volume (0.0151).</li>
+    <li><strong>Boundary False Positives:</strong> High-volume head pages dropping from 59 to 34 clicks (decay ratio 0.576) are classified as false positives under a strict &lt;0.50 binary threshold, yet represent actionable business recovery opportunities that the model appropriately prioritizes.</li>
+    <li><strong>Intentional Long-Tail Deprioritization:</strong> Over 14,000 low-volume decaying pages (e.g., 4 &rarr; 1 clicks) receive action scores &lt;0.20, protecting editorial review bandwidth for high-impact content.</li>
+    <li><strong>Scope:</strong> Results represent directional decision-support recommendations and do not assert causal search engine ranking claims.</li>
+  </ul>
+
+  <h2>6. Ranked Editorial Playbook</h2>
+  <ol>
+    <li><strong>High Priority (Score &ge; 0.50):</strong> Place on immediate editorial sprint for title rewrite, content refresh, and search intent re-optimization.</li>
+    <li><strong>Moderate Watchlist (0.25 &le; Score &lt; 0.50):</strong> Monitor for continued ranking drift.</li>
+    <li><strong>Low / Stable (Score &lt; 0.25):</strong> No manual review required; suppress from queue.</li>
+  </ol>
+
+  <h2>7. Reproducibility & Data Credit</h2>
+  <p>All pipeline code, SQL queries, and experimental validation notebooks are available in the project repository.</p>
+  <p>Built on the <a href="https://flyrank.ai" target="_blank" rel="noopener noreferrer">FlyRank ML Internship dataset</a>.</p>
+
+</body>
+</html>
